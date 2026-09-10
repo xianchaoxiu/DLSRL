@@ -11,11 +11,6 @@ A pretrained diffusion policy generates action sequences by iteratively denoisin
 
 The base diffusion policy remains fixed while the steering policy learns from environment interactions and rewards. The current robotic task configurations use the DSRL-NA training backend by default.
 
-## Framework
-
-![Comparison of DSRL and DLSRL](assets/dlsrl_compare.png)
-
-*Noise-space steering in DSRL and dual-latent-space steering in DLSRL.* [PDF](assets/dlsrl_compare.pdf)
 
 ## Features
 
@@ -26,6 +21,7 @@ The base diffusion policy remains fixed while the steering policy learns from en
 ## Installation
 
 Run the following commands from the repository root.
+Download robosuite.
 
 **1. Create the environment**
 
