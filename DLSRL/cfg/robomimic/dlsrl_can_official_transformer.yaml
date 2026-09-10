@@ -1,0 +1,126 @@
+defaults:
+  - _self_
+
+hydra:
+  run:
+    dir: ${logdir}
+
+name: robomimic_can_dlsrl_official_transformer_v4_${now:%Y-%m-%d}_${now:%H-%M-%S}_${seed}
+logdir: ${log_dir}/robomimic-dsrl/${name}/${now:%Y-%m-%d}_${now:%H-%M-%S}_${seed}
+offline_data_path: ./dppo/log/robomimic/can_test/train_offline.npz
+dppo_path: ./dppo
+
+# The official real-stanford checkpoint is trained on raw lowdim observations and
+# absolute 10-D actions: xyz + rotation_6d + gripper.
+normalization_path: null
+
+algorithm: dsrl_na # options are: dsrl_na, dsrl_sac
+
+seed: 1
+device: cuda:0
+use_wandb: True
+env_name: can
+log_dir: ./logs
+obs_dim: 46
+action_dim: 10
+cond_steps: 2
+act_steps: 4
+load_offline_data: False
+deterministic_eval: False
+run_initial_eval: False
+
+eval_interval: 1000
+num_evals: 100
+save_model_interval: 10000
+save_replay_buffer: False
+
+env:
+  n_envs: 50
+  n_eval_envs: 25
+  name: ${env_name}
+  max_episode_steps: 400
+  reset_at_iteration: False
+  save_video: False
+  best_reward_threshold_for_success: 1
+  reward_offset: 1
+  wrappers:
+    robomimic_lowdim:
+      normalization_path: ${normalization_path}
+      low_dim_keys: ['object',
+                    'robot0_eef_pos',
+                    'robot0_eef_quat',
+                    'robot0_gripper_qpos']
+    multi_step:
+      n_obs_steps: ${cond_steps}
+      n_action_steps: ${act_steps}
+      max_episode_steps: ${env.max_episode_steps}
+      reset_within_step: True
+
+wandb:
+  project: dsrl
+  run: ${now:%H-%M-%S}_${name}
+  group: robomimic-can
+
+train:
+  tau: 0.005
+  actor_lr: 3e-4
+  batch_size: 256
+  train_freq: 1
+  utd: 20
+  noise_critic_grad_steps: 10
+  actor_gradient_steps: 20
+  use_layer_norm: True
+  layer_size: 2048
+  num_layers: 3
+  discount: 0.99
+  ent_coef: -1
+  target_ent: 0.0
+  init_rollout_steps: 100
+  action_magnitude: 1.5
+  action_norm_regularization: 0.0
+  n_critics: 2
+  critic_backup_combine_type: min
+
+adapter:
+  enabled: True
+  # pi0-style compressed control: actor learns one latent step and the wrapper
+  # repeats adapter controls across the 4-step Transformer DP action chunk.
+  # Keep diffusion noise per action step; repeating noise breaks the act4 base policy.
+  latent_steps: 1
+  noise_steps: 4
+  # The DSRL-NA actor uses the wrapped Robomimic action bounds [-1, 1].
+  noise_magnitude: 1.0
+  # Noise rows keep the baseline initialization; only adapter controls use this low variance.
+  log_std_init: 0.0
+  control_log_std_init: -3.0
+  entropy_noise_only: True
+  control_dim: 16
+  gate_dim: 1
+  feature_dim: 256
+  hidden_dim: 128
+  # Match the validated pi0 adapter: start with a zero residual head, then
+  # jointly learn feature and gate under bounded, weakly regularized injection.
+  feature_init_std: 0.0
+  feature_scale: 0.25
+  gate_max: 0.2
+  gate_logit_scale: 5.0
+  gate_logit_bias: -2.5
+  injection_scale: 5e-4
+  l2_coef: 5e-3
+  gate_l1_coef: 5e-3
+  warmup_steps: 0
+  ramp_steps: 0
+  gradient_scale: 1.0
+
+official_diffusion_policy:
+  abs_action: True
+  single_obs_dim: 23
+  obs_history_steps: 2
+
+model:
+  _target_: official_dp_adapter.OfficialDiffusionPolicyAdapter
+  checkpoint_path: /home/mlo/diffusion_policy/can_transformer_act4_epoch0175_adapter_state.pt
+  device: ${device}
+  num_inference_steps: 8
+  sampler: ddim
+  clip_sample: True

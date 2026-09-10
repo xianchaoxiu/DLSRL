@@ -1,0 +1,82 @@
+defaults:
+  - dsrl_lift
+  - _self_
+
+name: robomimic_lift_dlsrl_transformer_v1_${now:%Y-%m-%d}_${now:%H-%M-%S}_${seed}
+
+# 7-D action, Ta=4, Td=20 Transformer Diffusion Policy trained on Lift.
+base_policy_path: /home/mlo/dsrl/dppo/log/lift_pre_diffusion_transformer_ta4_td20_emb128/2026-07-19_22-19-32_46/checkpoint/state_50.pt
+
+# Match the Square DLSRL experiment while retaining Lift's
+# task-specific observation and episode settings.
+total_timesteps: 400000
+run_initial_eval: True
+eval_interval: 150
+num_evals: 100
+save_model_interval: 1000
+
+env:
+  n_envs: 50
+  n_eval_envs: 25
+  max_episode_steps: 300
+
+train:
+  utd: 10
+  discount: 0.99
+  init_rollout_steps: 1501
+
+model:
+  _target_: model.diffusion.diffusion_eval.DiffusionEval
+  ft_denoising_steps: 0
+  predict_epsilon: True
+  denoised_clip_value: 1.0
+  randn_clip_value: 3
+  network_path: ${base_policy_path}
+  network:
+    _target_: model.diffusion.transformer_diffusion.DiffusionTransformer
+    action_dim: ${action_dim}
+    horizon_steps: ${act_steps}
+    cond_dim: ${eval:'${obs_dim} * ${cond_steps}'}
+    n_layer: 4
+    n_head: 4
+    n_emb: 128
+    p_drop_emb: 0.0
+    p_drop_attn: 0.1
+    causal_attn: True
+    n_cond_layers: 0
+  horizon_steps: ${act_steps}
+  obs_dim: ${obs_dim}
+  action_dim: ${action_dim}
+  denoising_steps: 20
+  device: ${device}
+  use_ddim: True
+  ddim_steps: 10
+  controllable_noise: True
+
+adapter:
+  enabled: True
+  # One state-dependent adapter residual is shared across the four action tokens.
+  latent_steps: 1
+  noise_steps: 4
+  noise_magnitude: 1.0
+  log_std_init: 0.0
+  control_log_std_init: -2.0
+  entropy_noise_only: True
+  control_dim: 16
+  gate_dim: 1
+  feature_dim: 128
+  hidden_dim: 128
+  feature_init_std: 1e-3
+  feature_scale: 0.25
+  gate_max: 0.2
+  gate_logit_scale: 5.0
+  gate_logit_bias: -2.5
+  injection_scale: 3e-2
+  critic_effect_scale: 20.0
+  l2_coef: 5e-2
+  gate_l1_coef: 1e-1
+  control_l2_coef: 5e-2
+  gate_code_l2_coef: 5e-1
+  warmup_steps: 10000
+  ramp_steps: 75000
+  gradient_scale: 0.5

@@ -1,0 +1,21 @@
+defaults:
+  - dlsrl_can_transformer
+  - _self_
+
+# Dedicated single-variable study of the Adapter activation ramp. The run name
+# includes the selected ramp so Hydra multirun jobs remain easy to identify.
+name: robomimic_can_dlsrl_transformer_ramp_${adapter.ramp_steps}_${now:%Y-%m-%d}_${now:%H-%M-%S}_${seed}
+
+# Keep every non-schedule Adapter setting fixed across the sweep. This avoids
+# mixing the ramp effect with the earlier injection-strength or Gate-L1 studies.
+adapter:
+  injection_scale: 3e-2
+  noise_magnitude: 1.0
+  gate_l1_coef: 0.1
+  warmup_steps: 5000
+  ramp_steps: 250000
+
+# Full sweep (12 sequential jobs with Hydra's default launcher):
+# python train_dsrl.py --config-path=cfg/robomimic \
+#   --config-name=dlsrl_can_transformer_ramp.yaml -m \
+#   seed=1,2,3 adapter.ramp_steps=0,25000,125000,250000
